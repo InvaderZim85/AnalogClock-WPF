@@ -1,104 +1,134 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
+using System.Timers;
+using System.Windows.Navigation;
 using System.Windows.Threading;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using Clock.Model;
+using ZimLabs.WpfBase;
 
 namespace Clock.ViewModel
 {
-    class AnalogClock : INotifyPropertyChanged
+    internal class MainViewModel : ObservableObject
     {
+        /// <summary>
+        /// Contains the timer for the clock
+        /// </summary>
+        private readonly DispatcherTimer _timer = new DispatcherTimer();
+
+        /// <summary>
+        /// Contains the timer for the clock
+        /// </summary>
+        private readonly Timer _clockTimer = new Timer(1000);
+
+        #region Properties for the view
+        /// <summary>
+        /// Gets or sets the hour parts
+        /// </summary>
         public List<ClockPart> HourParts { get; set; }
+
+        /// <summary>
+        /// Get sor sets the second parts
+        /// </summary>
         public List<ClockPart> SecondParts { get; set; }
 
-        private DispatcherTimer Timer { get; set; } = new DispatcherTimer();
-
-        private double angleHour;
-        private double angleMin;
-        private double angleSec;
-
-        #region Get-Set
+        /// <summary>
+        /// Backing field for <see cref="AngleHour"/>
+        /// </summary>
+        private double _angleHour;
+        /// <summary>
+        /// Gets or sets the angle of the hour hand
+        /// </summary>
         public double AngleHour
         {
-            get { return angleHour; }
-            set
-            {
-                angleHour = value;
-                OnPropertyChanged("AngleHour");
-            }
+            get => _angleHour;
+            set => SetField(ref _angleHour, value);
         }
 
-
+        /// <summary>
+        /// Backing field for <see cref="AngleMin"/>
+        /// </summary>
+        private double _angleMin;
+        /// <summary>
+        /// Gets or sets the angle of the minute hand
+        /// </summary>
         public double AngleMin
         {
-            get { return angleMin; }
-            set
-            {
-                angleMin = value;
-                OnPropertyChanged("AngleMin");
-            }
-        } 
+            get => _angleMin;
+            set => SetField(ref _angleMin, value);
+        }
 
+        /// <summary>
+        /// Backing field for <see cref="AngleSec"/>
+        /// </summary>
+        private double _angleSec;
+        /// <summary>
+        /// Gets or sets the angle of the seconds hand
+        /// </summary>
         public double AngleSec
         {
-            get { return angleSec; }
-            set
-            {
-                angleSec = value;
-                OnPropertyChanged("AngleSec");
-            }
+            get => _angleSec;
+            set => SetField(ref _angleSec, value);
+        }
+
+        /// <summary>
+        /// Backing field for <see cref="DateTime"/>
+        /// </summary>
+        private string _dateTimeValue = DateTime.Now.ToString("G"); 
+
+        /// <summary>
+        /// Gets or sets the current date / time
+        /// </summary>
+        public string DateTimeValue
+        {
+            get => _dateTimeValue;
+            set => SetField(ref _dateTimeValue, value);
         }
         #endregion
 
-        #region Constructor
-
-        public AnalogClock()
+        /// <summary>
+        /// Creates a new instance of the <see cref="MainViewModel"/>
+        /// </summary>
+        public MainViewModel()
         {
-            HourParts = new List<ClockPart>();
-            for (int x = 0; x < 12; x++)
-            {
-                HourParts.Add(new ClockPart()
-                {
-                    Number = (x + 1).ToString(),
-                    Angle = (x + 1 ) * (360 / 12),
-                });
-            }
+            HourParts = ClockPart.GetHourParts();
 
-            SecondParts = new List<ClockPart>();
-            for (int x = 0; x < 60; x++)
-            {
-                SecondParts.Add(new ClockPart()
-                {
-                    Number = (x + 1).ToString(),
-                    Angle = (x + 1) * (360 / 60),
-                });
-            }
+            SecondParts = ClockPart.GetSecondParts();
 
-            Timer.Interval = TimeSpan.FromSeconds(1);
-            Timer.Tick += Timer_Tick;
-            Timer.Start();
+            _clockTimer.Elapsed += _clockTimer_Elapsed;
+            _clockTimer.Start();
         }
-        #endregion
 
-        #region PropChange
-        public event PropertyChangedEventHandler PropertyChanged;
-        public void OnPropertyChanged([CallerMemberName]string prop = null)
+        /// <summary>
+        /// Occurs when the timer elapsed
+        /// </summary>
+        private void _clockTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(prop));
+            var time = DateTime.Now;
+            DateTimeValue = time.ToString("G");
+            AngleHour = GetAccurateAngle(time, true);
+            AngleMin = GetAccurateAngle(time, false);
+            AngleSec = time.Second * (360 / 60);
         }
-        #endregion
 
-        private void Timer_Tick(object sender, EventArgs e)
+        /// <summary>
+        /// Calculates the accurate angle for the hour
+        /// </summary>
+        /// <param name="time">The current time</param>
+        /// <param name="hour">true to calculate the hour, false to calculate the minutes</param>
+        /// <returns>The angle</returns>
+        private double GetAccurateAngle(DateTime time, bool hour)
         {
-            DateTime time = DateTime.Now;
-            AngleHour = (time.Hour) * (360 / 12);
-            AngleMin = (time.Minute) * (360 / 60);
-            AngleSec = (time.Second) * (360 / 60);
+            var decimalValue = hour ? 1d / 60 * time.Minute : 1d / 60 * time.Second;
+
+            double result;
+            if (hour)
+                result = (time.Hour + decimalValue) * (360d / 12);
+            else
+                result = (time.Minute + decimalValue) * (360d / 60);
+
+            return result;
         }
     }
 }
